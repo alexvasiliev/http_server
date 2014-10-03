@@ -14,7 +14,7 @@ void conn_readcb(struct bufferevent *, void *);
 void conn_eventcb(struct bufferevent *, short, void *);
 void accept_error_cb(struct evconnlistener *listener, void *ctx);
 
-static void theadFunc1();
+/*static void theadFunc1();
 boost::lockfree::queue<int> q(1024);
 
 void listener_cb_1(struct evconnlistener *listener, evutil_socket_t fd,
@@ -30,13 +30,15 @@ static void threadFunc1() {
     }
     int fd;
     while(1) {
-        event_base_loop(base, EVLOOP_ONCE);
         if(q.pop(fd)){
+            //printf("%p\n", base);
             listener_cb(NULL, fd, NULL, 0, (void*)base);
         }
+        event_base_loop(base, EVLOOP_NONBLOCK);
+        usleep(1);
     }
 }
-volatile bool isRun = true;
+volatile bool isRun = true;*/
 
 int main()
 {
@@ -44,11 +46,11 @@ int main()
     struct evconnlistener *listener;
     struct sockaddr_in sin;
 
-    int numThreads =  1;//std::thread::hardware_concurrency();
-    printf("Starting server on localhost:%d\nNumber of working threads: %d\n", PORT, numThreads);
+    int workers =  2;//std::thread::hardware_concurrency();
+    /*printf("Starting server on localhost:%d\nNumber of working threads: %d\n", PORT, numThreads);
     for(int i = 0; i < numThreads; ++i) {
         std::thread (threadFunc1).detach();
-    }
+    }*/
     base = event_base_new();
     if (!base) {
         fprintf(stderr, "Could not initialize libevent!\n");
@@ -58,7 +60,7 @@ int main()
     sin.sin_port = htons(PORT);
     sin.sin_family = AF_INET;
 
-    listener = evconnlistener_new_bind(base, listener_cb_1, (void *)base,
+    listener = evconnlistener_new_bind(base, listener_cb, (void *)base,
         LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE, -1,
         (struct sockaddr*)&sin,
         sizeof(sin));
@@ -70,6 +72,31 @@ int main()
 
     evconnlistener_set_error_cb(listener, accept_error_cb);
 
+
+    if (workers > 0) {
+        for(int i = 1; i < workers; ++i) {
+            pid_t pid;
+            switch((pid = fork())) {
+            case -1:
+                cerr << "error on fork()!\n";
+                abort();
+            case 0:
+                cout << "Subprocess " << i << " (" << pid << ") created.\n";
+                event_reinit(base);
+                cout << "Dispatching from worker " << i << "\n";
+                event_base_dispatch(base);
+
+                return -1;
+            default:
+                break;
+           }
+        }
+    } else {
+        cerr << "No worker subproceses!\n";
+    }
+
+    event_reinit(base);
+
     event_base_dispatch(base);
 
     evconnlistener_free(listener);
@@ -77,6 +104,9 @@ int main()
 
     printf("done\n");
     return 0;
+
+
+
 }
 
 void accept_error_cb(struct evconnlistener *listener, void *ctx)
@@ -104,7 +134,6 @@ void listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
     bufferevent_setcb(bev, conn_readcb, NULL, conn_eventcb, NULL);
     int res = bufferevent_enable(bev, EV_READ);
 }
-
 
 
 
