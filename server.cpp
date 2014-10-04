@@ -171,7 +171,6 @@ void sendDocument(struct bufferevent *pBufferEvent)
     {
         sWholePath.erase(remove_if(sWholePath.begin(), sWholePath.end(), char_isspace),sWholePath.end());
         fd = open(sWholePath.c_str(), O_RDONLY);
-        //qDebug()<<QString::fromStdString(sWholePath.c_str()) << "HEAD";
         if (fstat(fd, &st)<0)
         {
             perror("fstat");
@@ -219,11 +218,12 @@ void sendDocument(struct bufferevent *pBufferEvent)
 
     //Write static file to output
 
-    //if(fd != -1)
+    //
+    //
     if(eRequestType == eGET)
-        evbuffer_add_file(pOutput, fd, 0, st.st_size);
-    //else if(eRequestType == eHEAD)
-        //evbuffer_add_printf(pOutput, "\r\n\r\n");//evbuffer_add(pOutput, CRLF, 2);
+        if(fd != -1)
+            evbuffer_add_file(pOutput, fd, 0, st.st_size);
+        //
 
     delete pHttpHeader;
 }

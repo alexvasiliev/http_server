@@ -1,12 +1,9 @@
 #include "server.h"
 #include <thread>
-#include <boost/lockfree/queue.hpp>
-
-
 
 using namespace std;
 
-#define PORT 8080
+#define PORT 80
 
 void listener_cb(struct evconnlistener *, evutil_socket_t, struct sockaddr *, int socklen, void *);
 void conn_writecb(struct bufferevent *, void *);
@@ -14,31 +11,6 @@ void conn_readcb(struct bufferevent *, void *);
 void conn_eventcb(struct bufferevent *, short, void *);
 void accept_error_cb(struct evconnlistener *listener, void *ctx);
 
-/*static void theadFunc1();
-boost::lockfree::queue<int> q(1024);
-
-void listener_cb_1(struct evconnlistener *listener, evutil_socket_t fd,
-        struct sockaddr *sa, int socklen, void *user_data)
-{
-    q.push(fd);
-}
-
-static void threadFunc1() {
-    event_base *base = event_base_new();
-    if (!base) {
-        perror("Base new");
-    }
-    int fd;
-    while(1) {
-        if(q.pop(fd)){
-            //printf("%p\n", base);
-            listener_cb(NULL, fd, NULL, 0, (void*)base);
-        }
-        event_base_loop(base, EVLOOP_NONBLOCK);
-        usleep(1);
-    }
-}
-volatile bool isRun = true;*/
 
 int main()
 {
@@ -46,11 +18,7 @@ int main()
     struct evconnlistener *listener;
     struct sockaddr_in sin;
 
-    int workers =  2;//std::thread::hardware_concurrency();
-    /*printf("Starting server on localhost:%d\nNumber of working threads: %d\n", PORT, numThreads);
-    for(int i = 0; i < numThreads; ++i) {
-        std::thread (threadFunc1).detach();
-    }*/
+    int workers =  std::thread::hardware_concurrency();//2;//
     base = event_base_new();
     if (!base) {
         fprintf(stderr, "Could not initialize libevent!\n");
@@ -74,16 +42,15 @@ int main()
 
 
     if (workers > 0) {
-        for(int i = 1; i < workers; ++i) {
+        for(int i = 1; i <= workers; ++i) {
             pid_t pid;
             switch((pid = fork())) {
             case -1:
-                cerr << "error on fork()!\n";
+                printf("error on fork()!\n");
                 abort();
             case 0:
-                cout << "Subprocess " << i << " (" << pid << ") created.\n";
+                printf("Subprocess %d created \n" , i);
                 event_reinit(base);
-                cout << "Dispatching from worker " << i << "\n";
                 event_base_dispatch(base);
 
                 return -1;
@@ -92,7 +59,7 @@ int main()
            }
         }
     } else {
-        cerr << "No worker subproceses!\n";
+        printf("No worker subproceses!\n");
     }
 
     event_reinit(base);
